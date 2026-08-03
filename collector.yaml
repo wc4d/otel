@@ -1,0 +1,26 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+      http:
+        endpoint: localhost:4318
+
+exporters:
+  awsemf:
+    namespace: ${env:CLOUDWATCH_METRICS_NAMESPACE}
+    log_group_name: ${env:CLOUDWATCH_METRICS_LOG_GROUP}
+    dimension_rollup_option: NoDimensionRollup
+    metric_declarations:
+      - dimensions: [[function, route]]
+        metric_name_selectors:
+          - ^demo\..*$
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [awsemf]
+  telemetry:
+    logs:
+      level: info

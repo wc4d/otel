@@ -1,0 +1,27 @@
+services:
+  collector:
+    image: public.ecr.aws/aws-observability/aws-otel-collector:v0.48.0
+    command: ["--config=/etc/otel/collector.yaml"]
+    volumes:
+      - ./collector-local.yaml:/etc/otel/collector.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  lambda:
+    build:
+      context: .
+      target: local
+    environment:
+      OTEL_SERVICE_NAME: otel-lambda-local
+      OTEL_SERVICE_NAMESPACE: lambda-demo
+      DEPLOYMENT_ENVIRONMENT: local
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRIC_EXPORT_INTERVAL: "1000"
+      OTEL_METRIC_EXPORT_TIMEOUT: "5000"
+    depends_on:
+      - collector
+    ports:
+      - "9000:8080"
+

@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Container Lambda with an embedded ADOT Collector and HTTP API test endpoint
+
+Parameters:
+  ImageUri:
+    Type: String
+    Description: Immutable ECR image URI, including its content digest
+
+Resources:
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-function'
+      RetentionInDays: 14
+
+  MetricsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/otel/${AWS::StackName}/metrics'
+      RetentionInDays: 14
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WriteApplicationAndEmfLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub '${FunctionLogGroup.Arn}:*'
+                  - !Sub '${MetricsLogGroup.Arn}:*'
+
+  Function:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - FunctionLogGroup
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-function'
+      Description: Emits sample OTLP metrics to an ADOT Collector embedded in the image
+      PackageType: Image
+      Code:
+        ImageUri: !Ref ImageUri
+      Role: !GetAtt FunctionRole.Arn
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 30
+      TracingConfig:
+        Mode: PassThrough
+      Environment:
+        Variables:
+          OPENTELEMETRY_COLLECTOR_CONFIG_URI: /var/task/collector.yaml
+          OTEL_SERVICE_NAME: !Sub '${AWS::StackName}-function'
+          OTEL_SERVICE_NAMESPACE: lambda-demo
+          DEPLOYMENT_ENVIRONMENT: cloud
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
+          OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: http://localhost:4318/v1/metrics
+          OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+          OTEL_METRICS_EXPORTER: otlp
+          OTEL_METRIC_EXPORT_INTERVAL: '1000'
+          OTEL_METRIC_EXPORT_TIMEOUT: '5000'
+          CLOUDWATCH_METRICS_NAMESPACE: OtelLambdaDemo
+          CLOUDWATCH_METRICS_LOG_GROUP: !Ref MetricsLogGroup
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-api'
+      Description: Public test endpoint for emitting sample OpenTelemetry metrics
+      ProtocolType: HTTP
+
+  LambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt Function.Arn
+      IntegrationMethod: POST
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 29000
+
+  MetricsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /metrics
+      Target: !Sub 'integrations/${LambdaIntegration}'
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+
+  AllowApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref Function
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/GET/metrics'
+
+Outputs:
+  ApiUrl:
+    Description: Invoke this URL with an optional count query parameter
+    Value: !Sub '${HttpApi.ApiEndpoint}/metrics'
+  FunctionName:
+    Value: !Ref Function
+  MetricsNamespace:
+    Value: OtelLambdaDemo
+  MetricsLogGroup:
+    Value: !Ref MetricsLogGroup

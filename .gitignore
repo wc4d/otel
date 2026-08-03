@@ -1,0 +1,32 @@
+.aws-layer/
+__pycache__/
+*.pyc
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python environments and tooling
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE and operating-system files
+.DS_Store
+.idea/
+.vscode/
+
+# Local build and deployment output
+dist/
+build/
+*.log
+*.tfstate
+*.tfstate.*
