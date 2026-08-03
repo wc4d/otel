@@ -38,20 +38,24 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 aws ecr get-login-password --region "$REGION" | \
   docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
 
-TEMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TEMP_DIR"' EXIT
+if [[ -n "${NEXUS_OTEL_URL:-}" ]]; then
+  "$PROJECT_DIR/fetch-otel-artifact.sh"
+else
+  TEMP_DIR=$(mktemp -d)
+  trap 'rm -rf "$TEMP_DIR"' EXIT
 
-LAYER_URL=$(aws lambda get-layer-version-by-arn \
-  --region "$REGION" \
-  --arn "$ADOT_LAYER_ARN" \
-  --query Content.Location \
-  --output text)
-curl --fail --location --silent --show-error "$LAYER_URL" --output "$TEMP_DIR/layer.zip"
-unzip -q "$TEMP_DIR/layer.zip" -d "$TEMP_DIR/layer"
+  LAYER_URL=$(aws lambda get-layer-version-by-arn \
+    --region "$REGION" \
+    --arn "$ADOT_LAYER_ARN" \
+    --query Content.Location \
+    --output text)
+  curl --fail --location --silent --show-error "$LAYER_URL" --output "$TEMP_DIR/layer.zip"
+  unzip -q "$TEMP_DIR/layer.zip" -d "$TEMP_DIR/layer"
 
-mkdir -p "$PROJECT_DIR/.aws-layer"
-find "$PROJECT_DIR/.aws-layer" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-cp -R "$TEMP_DIR/layer/." "$PROJECT_DIR/.aws-layer/"
+  mkdir -p "$PROJECT_DIR/.build/aws-layer"
+  find "$PROJECT_DIR/.build/aws-layer" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  cp -R "$TEMP_DIR/layer/." "$PROJECT_DIR/.build/aws-layer/"
+fi
 
 docker build --platform linux/amd64 --target lambda \
   --provenance=false \

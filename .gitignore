@@ -1,4 +1,6 @@
 .aws-layer/
+.build/
+artifacts/
 __pycache__/
 *.pyc
 
