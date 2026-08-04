@@ -40,7 +40,7 @@ A fresh copy of this collector-only layer is also available from the project's
 versioned public artifact bucket:
 
 ```text
-https://wc4d-public-otel-artifacts-691440196496-eu-west-2.s3.eu-west-2.amazonaws.com/aws-otel-collector/0.117.0/amd64/aws-otel-collector-amd64-0.117.0.zip
+https://public-otel-artifacts-eu-west-2-2026-08-04.s3.eu-west-2.amazonaws.com/aws-otel-collector/0.117.0/amd64/aws-otel-collector-amd64-0.117.0.zip
 ```
 
 Expected SHA-256:
