@@ -36,6 +36,19 @@ The default collector package is:
 arn:aws:lambda:eu-west-2:901920570463:layer:aws-otel-collector-amd64-ver-0-117-0:1
 ```
 
+A fresh copy of this collector-only layer is also available from the project's
+versioned public artifact bucket:
+
+```text
+https://wc4d-public-otel-artifacts-691440196496-eu-west-2.s3.eu-west-2.amazonaws.com/aws-otel-collector/0.117.0/amd64/aws-otel-collector-amd64-0.117.0.zip
+```
+
+Expected SHA-256:
+
+```text
+fa8fb33f2e3892990533de2089c05073fa88e64b0213ded93673acc31f7e1a5a
+```
+
 AWS returns its download as a short-lived signed URL. Retrieve a fresh URL
 with:
 
